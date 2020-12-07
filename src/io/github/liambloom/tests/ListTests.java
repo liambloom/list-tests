@@ -210,5 +210,6 @@ public class ListTests {
 
     private void testCanceled() {
         System.out.println("Aborting test " + seed);
+        AnsiConsole.systemUninstall();
     }
 }
