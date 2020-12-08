@@ -27,3 +27,13 @@ for (int i = 0; i < 20; i++) // Feel free to run it any number of times. I will 
 ### How does it work?
 
 Reflection is used to iterate over and call every method in the `List` interface. This method is called on both your custom list *and* an `ArrayList`. After each method call, the outputs and the state of the array are compared. A test fails if they are not equal.
+
+### Acknowledgements
+
+- [fusecore/jansi](https://github.com/fusesource/jansi)
+
+### License
+
+This project is licensed under [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0). More details can be found in [`LICENSE`](/LICENSE). 
+
+&copy; 2020 Liam Bloom
