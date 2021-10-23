@@ -1,4 +1,4 @@
-package io.github.liambloom.tests;
+package dev.liambloom.tests;
 
 public class UnequalReturnValuesException extends IllegalStateException {
     final String message;

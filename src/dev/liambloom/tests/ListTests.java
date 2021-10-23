@@ -1,31 +1,50 @@
-package io.github.liambloom.tests;
+package dev.liambloom.tests;
 
 import java.util.*;
 import java.util.function.*;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.*;
 import org.fusesource.jansi.AnsiConsole;
 import static org.fusesource.jansi.Ansi.*;
 import static org.fusesource.jansi.Ansi.Color.*;
 
 public class ListTests {
-    private final Random r = new Random();
+    private final Random r;
     private final Runtime runtime = Runtime.getRuntime();
     private final Thread hook = new Thread(this::testCanceled);
     private final Supplier<List<Integer>> supplier;
+    private final int depth;
     private long seed;
     private boolean failed = false;
 
     protected List<Integer> subject;
-    protected List<Integer> control = new ArrayList<>();
+    protected List<Integer> control;
 
     public ListTests(final Supplier<List<Integer>> supplier) {
         this.supplier = supplier;
         this.subject = supplier.get();
+        this.control  = new ArrayList<>();
+        depth = 0;
+        r = new Random();
     }
 
     public ListTests(final List<Integer> subject) {
+        this(subject, new ArrayList<>());
+    }
+
+    public ListTests(final List<Integer> subject, final List<Integer> control) {
+        this(subject, control, 0, new Random());
+    }
+
+    private ListTests(final List<Integer> subject, final List<Integer> control, int depth, Random r) {
         this.supplier = null;
         this.subject = subject;
+        this.control = control;
+        this.depth = depth;
+        this.r = r;
     }
 
     public class Result {
@@ -68,11 +87,13 @@ public class ListTests {
 
         this.seed = seed;
         r.setSeed(seed);
-        System.out.println("Running test " + seed);
+        System.out.println("\t".repeat(depth) + "Running test " + seed);
         runtime.addShutdownHook(hook);
 
         for (Method method : List.class.getDeclaredMethods()) {
-            System.out.print(method.getName() + "(");
+            if (method.getName().equals("hashCode"))
+                continue;
+            System.out.print("\t".repeat(depth) + method.getName() + "(");
 
             if (control.size() != subject.size())
                 return endTests(new Result(method, new IllegalStateException("Sizes have become desynced (control is "
@@ -84,10 +105,10 @@ public class ListTests {
                 for (int j = 0; j < testLength; j++)
                     subject.add(r.nextInt());
                 control.addAll(subject);
-            }
 
-            if (control.size() == 0)
-                return endTests(new Result(method, new IllegalStateException("Either size() or add(Object) don't work")));
+                if (control.size() == 0 || !control.equals(subject))
+                    return endTests(new Result(method, new IllegalStateException("Either size() or add(Object) don't work")));
+            }
 
             Class<?>[] params = method.getParameterTypes();
             Object[] args = new Object[params.length];
@@ -149,17 +170,26 @@ public class ListTests {
                         // .equals() won't work for it.
                         method.invoke(subject, args);
                         ok = true;
-                    } 
+                    }
+
                     else {
                         Object res2 = method.invoke(subject, args);
                         if (res1 == null)
                             ok = res2 == null;
+                        else if (method/*.equals(List.class.getMethod("subList", int.class, int.class))*/.getName().equals("subList") && depth <= 2){
+                            Result r = new ListTests((List<Integer>) res2, (List<Integer>) res1, depth + 1, this.r).runTests();
+                            if (!r.succeeded())
+                                return endTests(r);
+                            else
+                                ok = true;
+                        }
                         else if (method.getReturnType().isArray())
                             ok = Arrays.equals((Object[]) res1, (Object[]) res2);
                         else
                             ok = res1.equals(res2);
+                        
                         errMsg = new UnequalReturnValuesException("Returned different values. control: %s; subject: %s",
-                                res1 == null ? "null" : res1.toString(), res2 == null ? "null" : res1.toString());
+                                res1 == null ? "null" : res1.toString(), res2 == null ? "null" : res2.toString());
                     }
                 } 
                 catch (Exception e) {
@@ -184,7 +214,7 @@ public class ListTests {
             else {
                 failed = true;
                 System.out.println(ansi().fg(RED).a("fail").reset());
-                System.out.printf("returned same: %b, post-values same: %b%n", ok, sameResult);
+                System.out.printf("\t".repeat(depth) + "returned same: %b, post-values same: %b%n", ok, sameResult);
                 if (ok)
                     errMsg = new IllegalStateException("control is not equal to subject");
                 return endTests(new Result(method, errMsg));
